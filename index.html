@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskFlow | Gestor CRUD Moderno</title>
+    <!-- Tailwind CSS para un diseño rápido y estético -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col justify-between">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <div class="bg-indigo-600 text-white p-2 rounded-xl font-bold text-lg shadow-md shadow-indigo-100">TF</div>
+                <h1 class="text-xl font-bold tracking-tight text-slate-900">TaskFlow</h1>
+            </div>
+            <span class="text-xs font-medium bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full border border-indigo-100">Práctico Unidad 4</span>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl w-full mx-auto px-4 py-8 flex-grow">
+        
+        <!-- Formulario de Creación / Edición -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8 transition-all">
+            <h2 id="form-title" class="text-lg font-semibold text-slate-900 mb-4">Nueva Tarea</h2>
+            <form id="task-form" class="space-y-4">
+                <input type="hidden" id="task-id">
+                <div>
+                    <label class="block text-xs font-medium uppercase tracking-wider text-slate-500 mb-1">Título</label>
+                    <input type="text" id="task-title" required placeholder="Ej. Diseñar interfaz de usuario..." 
+                        class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium uppercase tracking-wider text-slate-500 mb-1">Descripción</label>
+                    <textarea id="task-desc" rows="2" placeholder="Detalles breves de la actividad..." 
+                        class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition-all resize-none"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" id="btn-cancel" onclick="resetForm()" class="hidden px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">Cancelar</button>
+                    <button type="submit" id="btn-submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2.5 rounded-xl text-sm shadow-md shadow-indigo-100 transition-all">Guardar Tarea</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Listado de Tareas (CRUD - Read) -->
+        <div>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-md font-semibold text-slate-900">Lista de Actividades</h3>
+                <span id="task-count" class="text-xs font-medium text-slate-500 bg-slate-200/60 px-2.5 py-1 rounded-full">0 tareas</span>
+            </div>
+            
+            <div id="tasks-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Las tareas se renderizan dinámicamente aquí -->
+            </div>
+
+            <!-- Estado Vacío -->
+            <div id="empty-state" class="hidden text-center py-12 bg-white rounded-2xl border border-dashed border-slate-300">
+                <p class="text-slate-400 text-sm">No hay tareas registradas todavía. ¡Crea una arriba!</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center py-6 text-xs text-slate-400 border-t border-slate-200 bg-white mt-12">
+        Desarrollado para entornos de control de versiones y despliegue web.
+    </footer>
+
+    <!-- Lógica JavaScript del CRUD -->
+    <script>
+        let tasks = JSON.parse(localStorage.getItem('taskflow_tasks')) || [
+            { id: '1', title: 'Configurar repositorio Git', desc: 'Inicializar control de versiones local y remoto.', date: '2026-08-29' },
+            { id: '2', title: 'Desplegar en hosting gratuito', desc: 'Subir la aplicación a Vercel o Firebase Hosting.', date: '2026-08-29' }
+        ];
+
+        const form = document.getElementById('task-form');
+        const taskIdInput = document.getElementById('task-id');
+        const taskTitleInput = document.getElementById('task-title');
+        const taskDescInput = document.getElementById('task-desc');
+        const tasksContainer = document.getElementById('tasks-container');
+        const emptyState = document.getElementById('empty-state');
+        const taskCount = document.getElementById('task-count');
+        const formTitle = document.getElementById('form-title');
+        const btnCancel = document.getElementById('btn-cancel');
+        const btnSubmit = document.getElementById('btn-submit');
+
+        // Renderizar tareas al cargar
+        document.addEventListener('DOMContentLoaded', renderTasks);
+
+        // CREATE & UPDATE
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = taskIdInput.value;
+            const title = taskTitleInput.value.trim();
+            const desc = taskDescInput.value.trim();
+            const date = new Date().toISOString().split('T')[0];
+
+            if (!title) return;
+
+            if (id) {
+                // Actualizar (Update)
+                tasks = tasks.map(task => task.id === id ? { ...task, title, desc } : task);
+            } else {
+                // Crear (Create)
+                const newTask = { id: Date.now().toString(), title, desc, date };
+                tasks.unshift(newTask);
+            }
+
+            saveAndRender();
+            resetForm();
+        });
+
+        // READ / RENDER
+        function renderTasks() {
+            tasksContainer.innerHTML = '';
+            taskCount.textContent = `${tasks.length} ${tasks.length === 1 ? 'tarea' : 'tareas'}`;
+
+            if (tasks.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            tasks.forEach(task => {
+                const card = document.createElement('div');
+                card.className = "bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between hover:shadow-md transition-all group";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-semibold text-slate-800 text-base group-hover:text-indigo-600 transition-colors">${escapeHTML(task.title)}</h4>
+                            <span class="text-[10px] text-slate-400 font-medium bg-slate-100 px-2 py-0.5 rounded-md">${task.date}</span>
+                        </div>
+                        <p class="text-slate-600 text-sm mb-4 leading-relaxed">${escapeHTML(task.desc || 'Sin descripción adicional.')}</p>
+                    </div>
+                    <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                        <button onclick="editTask('${task.id}')" class="px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors">Editar</button>
+                        <button onclick="deleteTask('${task.id}')" class="px-3 py-1.5 text-xs font-medium text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors">Eliminar</button>
+                    </div>
+                `;
+                tasksContainer.appendChild(card);
+            });
+        }
+
+        // Preparar para Editar (Update setup)
+        function editTask(id) {
+            const task = tasks.find(t => t.id === id);
+            if (!task) return;
+
+            taskIdInput.value = task.id;
+            taskTitleInput.value = task.title;
+            taskDescInput.value = task.desc;
+
+            formTitle.textContent = "Editar Tarea";
+            btnSubmit.textContent = "Actualizar Tarea";
+            btnCancel.classList.remove('hidden');
+            taskTitleInput.focus();
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // DELETE
+        function deleteTask(id) {
+            if (confirm('¿Estás seguro de que deseas eliminar esta tarea?')) {
+                tasks = tasks.filter(task => task.id !== id);
+                saveAndRender();
+            }
+        }
+
+        function resetForm() {
+            form.reset();
+            taskIdInput.value = '';
+            formTitle.textContent = "Nueva Tarea";
+            btnSubmit.textContent = "Guardar Tarea";
+            btnCancel.classList.add('hidden');
+        }
+
+        function saveAndRender() {
+            localStorage.setItem('taskflow_tasks', JSON.stringify(tasks));
+            renderTasks();
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+    </script>
+</body>
+</html>
